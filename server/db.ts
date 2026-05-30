@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, subscriptions, InsertSubscription, Subscription } from "../drizzle/schema";
+import { InsertUser, users, subscriptions, InsertSubscription, Subscription, aiConversations, documents, paymentTransactions } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -227,6 +227,156 @@ export async function resetMonthlyQuota(userId: number): Promise<void> {
       .where(eq(subscriptions.userId, userId));
   } catch (error) {
     console.error("[Database] Failed to reset monthly quota:", error);
+  }
+}
+
+/**
+ * Save AI conversation to database
+ */
+export async function saveConversation(
+  userId: number,
+  language: string,
+  topic: string,
+  messages: any[],
+  summary: string
+) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  try {
+    const result = await db.insert(aiConversations).values({
+      userId,
+      language: language as any,
+      topic: topic as any,
+      messages,
+      summary,
+    });
+    return result;
+  } catch (error) {
+    console.error('[Database] Failed to save conversation:', error);
+    return undefined;
+  }
+}
+
+/**
+ * Get user conversations
+ */
+export async function getUserConversations(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  try {
+    const result = await db
+      .select()
+      .from(aiConversations)
+      .where(eq(aiConversations.userId, userId));
+    return result;
+  } catch (error) {
+    console.error('[Database] Failed to get conversations:', error);
+    return [];
+  }
+}
+
+/**
+ * Cancel subscription
+ */
+export async function cancelSubscription(userId: number) {
+  const db = await getDb();
+  if (!db) return false;
+
+  try {
+    await db
+      .update(subscriptions)
+      .set({
+        status: 'cancelled',
+        cancelledAt: new Date(),
+      })
+      .where(eq(subscriptions.userId, userId));
+    return true;
+  } catch (error) {
+    console.error('[Database] Failed to cancel subscription:', error);
+    return false;
+  }
+}
+
+/**
+ * Save generated document
+ */
+export async function saveDocument(
+  userId: number,
+  documentType: string,
+  title: string,
+  storageKey: string,
+  storageUrl: string,
+  metadata: any
+) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  try {
+    const result = await db.insert(documents).values({
+      userId,
+      documentType: documentType as any,
+      title,
+      storageKey,
+      storageUrl,
+      metadata,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+    });
+    return result;
+  } catch (error) {
+    console.error('[Database] Failed to save document:', error);
+    return undefined;
+  }
+}
+
+/**
+ * Get user documents
+ */
+export async function getUserDocuments(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  try {
+    const result = await db
+      .select()
+      .from(documents)
+      .where(eq(documents.userId, userId))
+      .orderBy((t) => t.createdAt);
+    return result;
+  } catch (error) {
+    console.error('[Database] Failed to get documents:', error);
+    return [];
+  }
+}
+
+/**
+ * Log payment transaction
+ */
+export async function logPaymentTransaction(
+  userId: number,
+  subscriptionId: number,
+  payFastTransactionId: string,
+  amount: number,
+  status: string,
+  transactionType: string
+) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  try {
+    const result = await db.insert(paymentTransactions).values({
+      userId,
+      subscriptionId,
+      payFastTransactionId,
+      amount: amount as any,
+      status: status as any,
+      transactionType: transactionType as any,
+    });
+    return result;
+  } catch (error) {
+    console.error('[Database] Failed to log payment transaction:', error);
+    return undefined;
   }
 }
 

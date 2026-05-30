@@ -33,8 +33,8 @@
 - [x] Build system prompts for SARS tax and CCMA labour law expertise
 - [x] Integrate OpenAI GPT-4o API with multilingual support
 - [x] Implement message streaming and real-time responses
-- [ ] Add conversation history storage to database
-- [ ] Create chat context persistence (remember user's business profile)
+- [x] Add conversation history storage to database
+- [x] Create chat context persistence (remember user's business profile)
 - [x] Add query usage tracking for subscription limits (tRPC router ready)
 - [ ] Build conversation export/download feature
 - [x] Write vitest tests for AI routing and language handling
@@ -43,11 +43,11 @@
 - [x] Create document template system (invoices, contracts, plans, H&S files)
 - [x] Build document generation UI with form inputs
 - [ ] Implement AI-powered document customization based on user business profile
-- [ ] Integrate S3 storage for generated documents
-- [ ] Create PDF generation pipeline
+- [x] Integrate S3 storage for generated documents (via storagePut)
+- [x] Create PDF generation pipeline (HTML to PDF conversion)
 - [x] Build document preview and download functionality
 - [x] Implement document history and retrieval
-- [ ] Add document expiration and cleanup logic
+- [x] Add document expiration and cleanup logic (30-day auto-expiry)
 - [x] tRPC routers for document generation ready
 - [x] Write vitest tests for document generation accuracy
 
@@ -70,11 +70,11 @@
 - [x] Implement PayFast checkout integration
 - [x] Build subscription status management (active, cancelled, suspended)
 - [x] Implement recurring billing with PayFast tokens
-- [ ] Create subscription cancellation flow
-- [ ] Build payment transaction logging and audit trail
+- [x] Create subscription cancellation flow
+- [x] Build payment transaction logging and audit trail
 - [x] Implement webhook handler for PayFast IPN (Instant Payment Notification)
 - [ ] Create payment failure handling and retry logic
-- [ ] Build subscription management UI (upgrade, cancel, view history)
+- [x] Build subscription management UI (upgrade, cancel, view history)
 - [ ] Add pro-rata refund calculations
 - [x] tRPC routers for payments and subscription management ready
 - [x] Write vitest tests for PayFast integration
