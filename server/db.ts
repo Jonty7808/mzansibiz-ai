@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, subscriptions, InsertSubscription, Subscription } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -35,7 +35,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     };
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod"] as const;
+    const textFields = ["name", "email", "loginMethod", "businessName", "businessAddress", "businessPhone"] as const;
     type TextField = (typeof textFields)[number];
 
     const assignNullable = (field: TextField) => {
@@ -47,6 +47,32 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     };
 
     textFields.forEach(assignNullable);
+
+    // Handle enum fields
+    if (user.businessType !== undefined) {
+      values.businessType = user.businessType;
+      updateSet.businessType = user.businessType;
+    }
+
+    if (user.preferredLanguage !== undefined) {
+      values.preferredLanguage = user.preferredLanguage;
+      updateSet.preferredLanguage = user.preferredLanguage;
+    }
+
+    if (user.taxNumber !== undefined) {
+      values.taxNumber = user.taxNumber;
+      updateSet.taxNumber = user.taxNumber;
+    }
+
+    if (user.uifNumber !== undefined) {
+      values.uifNumber = user.uifNumber;
+      updateSet.uifNumber = user.uifNumber;
+    }
+
+    if (user.businessRegistration !== undefined) {
+      values.businessRegistration = user.businessRegistration;
+      updateSet.businessRegistration = user.businessRegistration;
+    }
 
     if (user.lastSignedIn !== undefined) {
       values.lastSignedIn = user.lastSignedIn;
@@ -89,4 +115,119 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+export async function updateUserProfile(userId: number, profile: Partial<InsertUser>): Promise<void> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot update user: database not available");
+    return;
+  }
+
+  try {
+    const updateSet: Record<string, unknown> = {};
+
+    const textFields = ["businessName", "businessAddress", "businessPhone", "taxNumber", "uifNumber", "businessRegistration"] as const;
+    textFields.forEach(field => {
+      if (profile[field] !== undefined) {
+        updateSet[field] = profile[field];
+      }
+    });
+
+    if (profile.businessType !== undefined) {
+      updateSet.businessType = profile.businessType;
+    }
+
+    if (profile.preferredLanguage !== undefined) {
+      updateSet.preferredLanguage = profile.preferredLanguage;
+    }
+
+    if (Object.keys(updateSet).length === 0) {
+      return;
+    }
+
+    await db.update(users).set(updateSet).where(eq(users.id, userId));
+  } catch (error) {
+    console.error("[Database] Failed to update user profile:", error);
+    throw error;
+  }
+}
+
+export async function getOrCreateSubscription(userId: number): Promise<Subscription> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  const existing = await db.select().from(subscriptions).where(eq(subscriptions.userId, userId)).limit(1);
+
+  if (existing.length > 0) {
+    return existing[0];
+  }
+
+  // Create new free subscription
+  const newSubscription: InsertSubscription = {
+    userId,
+    tier: 'free',
+    status: 'active',
+    monthlyQuota: 10,
+    queriesUsedThisMonth: 0,
+  };
+
+  await db.insert(subscriptions).values(newSubscription);
+
+  const created = await db.select().from(subscriptions).where(eq(subscriptions.userId, userId)).limit(1);
+  if (!created[0]) {
+    throw new Error("Failed to create subscription");
+  }
+
+  return created[0];
+}
+
+export async function getSubscription(userId: number): Promise<Subscription | undefined> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get subscription: database not available");
+    return undefined;
+  }
+
+  const result = await db.select().from(subscriptions).where(eq(subscriptions.userId, userId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function incrementQueryUsage(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot increment query usage: database not available");
+    return;
+  }
+
+  try {
+    const subscription = await getSubscription(userId);
+    if (!subscription) {
+      return;
+    }
+
+    await db.update(subscriptions)
+      .set({ queriesUsedThisMonth: (subscription.queriesUsedThisMonth ?? 0) + 1 })
+      .where(eq(subscriptions.userId, userId));
+  } catch (error) {
+    console.error("[Database] Failed to increment query usage:", error);
+  }
+}
+
+export async function resetMonthlyQuota(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot reset quota: database not available");
+    return;
+  }
+
+  try {
+    await db.update(subscriptions)
+      .set({ queriesUsedThisMonth: 0 })
+      .where(eq(subscriptions.userId, userId));
+  } catch (error) {
+    console.error("[Database] Failed to reset monthly quota:", error);
+  }
+}
+
+// TODO: Add more feature queries as your schema grows
